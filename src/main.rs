@@ -45,7 +45,7 @@ fn naive_eval(x:&Vec<i128>, f:&HashMap<Vec<u32>,i128>, q:u128) -> i128 { // This
 fn translate_into_R(f:&HashMap<Vec<u32>,i128>) -> Poly<f64> { // This is an auxiliary function to translate types
     let mut f_coeffs: Vec<f64> = Vec::new();
     for i in 0..f.len() {
-        f_coeffs.push(f.get(&vec![i as u32]).unwrap().clone() as f64);
+        f_coeffs.push(f.get(&vec![i as u32]).unwrap_or(&0).clone() as f64);
     }
     let f_hat: Poly<f64> = Poly::new_from_coeffs(&f_coeffs);
     f_hat
@@ -254,7 +254,7 @@ fn preprocessingA3(d:u32, q:u128, m:u32, f:HashMap<Vec<u32>,i128>) -> (Vec<u128>
 }
 
 
-fn fast_evalA3(alpha:&Vec<i128>, f:&HashMap<Vec<u32>,i128>, DS:(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q:u128) -> i128 { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
+fn fast_evalA3(alpha:&Vec<i128>, DS:(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q:u128) -> i128 { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
     //let t0: Instant = Instant::now();
     let mut i: u32 = 0;
     let mut residues: Vec<i128> = Vec::with_capacity(DS.0.len() as usize);
@@ -296,7 +296,7 @@ fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function 
 
     // Evaluations
     let t0_fe: Instant = Instant::now();
-    let fe: i128 = fast_evalA3(&alpha,&f,DS,q);
+    let fe: i128 = fast_evalA3(&alpha,DS,q);
     let time_fe: Duration = t0_fe.elapsed();
 
     let t0_ne: Instant = Instant::now();
@@ -315,22 +315,19 @@ fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function 
 
 fn main() {
     let mut f: HashMap<Vec<u32>,i128> = HashMap::new();
-    f.insert(vec![2,2],3);
-    f.insert(vec![2,1],3);
-    f.insert(vec![2,0],0);
-    f.insert(vec![1,2],2);
     f.insert(vec![1,1],1);
-    f.insert(vec![1,0],4);
-    f.insert(vec![0,2],1);
-    f.insert(vec![0,1],0);
+    f.insert(vec![1,0],2);
+    f.insert(vec![0,1],1);
     f.insert(vec![0,0],1);
-    let f_Z_5: HashMap<Vec<i128>,i128> = multipoint_multivariate_evaluation(&f,5,2);
-    for v in (0..2).map(|i| 0..5 as i128).multi_cartesian_product() {
-        println!("Value");
-        println!("{:?}",v);
-        println!("Naive evaluation:");
-        println!("{:?}",naive_eval(&v,&f,5));
-        println!("Multipoint evaluation:");
-        println!("{:?}\n",f_Z_5.get(&v).unwrap());
+    let d: u32 = 2;
+    let m: u32 = 2;
+    let q: u128 = 3;
+    let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,f.clone());
+    println!("{:?}",DS);
+    for alpha in (0..2).map(|i| 0..3 as i128).multi_cartesian_product() {
+        println!("Alpha");
+        println!("{:?}",alpha);
+        println!("Evaluation in alpha:");
+        println!("{:?}\n",fast_evalA3(&alpha, DS.clone(), q));
     }
 }
