@@ -42,6 +42,17 @@ fn naive_eval(x:&Vec<i128>, f:&HashMap<Vec<u32>,i128>, q:u128) -> i128 { // This
 }
 
 
+fn add_head(h:i128, x:&Vec<i128>) -> Vec<i128> { // Auxiliary function to add a head to a vec
+    let l: usize = x.len()+1;
+    let mut hx: Vec<i128> = Vec::with_capacity(l);
+    hx.push(h);
+    for i in x {
+        hx.push(*i);
+    }
+    hx
+}
+
+
 fn translate_into_R(f:&HashMap<Vec<u32>,i128>) -> Poly<f64> { // This is an auxiliary function to translate types
     let mut f_coeffs: Vec<f64> = Vec::new();
     for i in 0..f.len() {
@@ -153,14 +164,13 @@ fn multipoint_multivariate_evaluation(f:&HashMap<Vec<u32>,i128>, p_i:u128, m:u32
         for beta in (0..m-1).map(|i| 0..p_i as i128).multi_cartesian_product() {
             let mut UV_f_beta: HashMap<Vec<u32>,i128> = HashMap::with_capacity(p_i as usize);
             for i in 0..p_i {
-                UV_f_beta.insert(vec![i as u32],*T_is[i as usize].clone().get(&beta).unwrap());
+                UV_f_beta.insert(vec![i as u32],*(T_is[i as usize]).get(&beta).unwrap());
             }
-            let mut beta0: i128 = 0;
-            for eval_beta0 in multipoint_univariate_evaluation(&UV_f_beta, p_i) {
-                let mut beta_tail: Vec<i128> = beta.clone();
-                beta_tail.insert(0,beta0);
-                T.insert(beta_tail,eval_beta0);
-                beta0 += 1;
+            let mut alpha0: i128 = 0;
+            for eval_alpha in multipoint_univariate_evaluation(&UV_f_beta, p_i) {
+                let alpha: Vec<i128> = add_head(alpha0,&beta);
+                T.insert(alpha,eval_alpha);
+                alpha0 += 1;
             }
         }
     }
@@ -176,7 +186,7 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
             let i_j: u32 = mon.0[j as usize];
             if ((i_j as u128) < p) {new_pows.push(i_j);}
             else {
-                let n_j: u32 = (((i_j as u128 - p) as f64 / (p - 1) as f64) + 1.0).floor() as u32;
+                let n_j: u32 = (((i_j as u128 - p) as f64 / (p-1) as f64)+1.0).floor() as u32;
                 let new_pow: u32 = i_j - n_j * (p as u32) + n_j;
                 new_pows.push(new_pow);
             }
@@ -193,8 +203,8 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
 }
 
 
-fn FFT_multipoint_eval(f:HashMap<Vec<u32>,i128>, p_i:u128, m:u32) -> HashMap<Vec<i128>,i128> { // This function implements [KU08, Theorem 4.1] (reduces f and evaluates it on all (Z_p_i)^m using FFT based multipoint evaluation)
-    let red_f: HashMap<Vec<u32>,i128> = module_Xp_X(&f,p_i,m);
+fn FFT_multipoint_eval(f:&HashMap<Vec<u32>,i128>, p_i:u128, m:u32) -> HashMap<Vec<i128>,i128> { // This function implements [KU08, Theorem 4.1] (reduces f and evaluates it on all (Z_p_i)^m using FFT based multipoint evaluation)
+    let red_f: HashMap<Vec<u32>,i128> = module_Xp_X(f,p_i,m);
     let T_i: HashMap<Vec<i128>,i128> = multipoint_multivariate_evaluation(&red_f,p_i,m);
     T_i
 }
@@ -210,65 +220,58 @@ fn lift(f:&HashMap<Vec<u32>,i128>, q:u128) -> HashMap<Vec<u32>,i128> { // This f
 }
 
 
-fn egcd(a:BigInt, b:BigInt) -> (BigInt,BigInt,BigInt) { // This is an auxiliary function for the CRT algorithm
-    if (a==0.to_bigint().unwrap()) {(b, 0.to_bigint().unwrap(), 1.to_bigint().unwrap())} 
+fn egcd(a:&BigInt, b:&BigInt) -> (BigInt,BigInt,BigInt) { // This is an auxiliary function for the CRT algorithm
+    if (*a == 0.to_bigint().unwrap()) {(b.clone(), 0.to_bigint().unwrap(), 1.to_bigint().unwrap())} 
     else {
-        let (g,x,y):(BigInt,BigInt,BigInt) = egcd(&b%&a,a.clone());
-        (g, y-(b/&a)*&x, x)
+        let (g,x,y):(BigInt,BigInt,BigInt) = egcd(&(b%a),a);
+        (g, y-(b/a)*&x, x)
     }
 }
 
 
-fn mod_inv(x:BigInt, n:BigInt) -> Option<BigInt> { // This is an auxiliary function for the CRT algorithm
-    let (g, x,_) = egcd(x,n.clone());
-    if (g==1.to_bigint().unwrap()) {Some(x.rem_euclid(&n))} 
+fn mod_inv(x:&BigInt, n:&BigInt) -> Option<BigInt> { // This is an auxiliary function for the CRT algorithm
+    let (g, x,_) = egcd(&x,&n);
+    if (g == 1.to_bigint().unwrap()) {Some(x.rem_euclid(&n))} 
     else {None}
 }
 
 
-fn Chinese_Remainder_Theorem(residues:Vec<BigInt>, modules:Vec<BigUint>) -> BigInt { // This function solves a system of modular equations given the modules and the residues using CRT
+fn Chinese_Remainder_Theorem(residues:&Vec<BigInt>, modules:Vec<BigUint>) -> BigInt { // This function solves a system of modular equations given the modules and the residues using CRT
     let prod: BigUint = modules.iter().product();
     let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
     for (residue,module) in residues.iter().zip(modules) {
         let p: BigInt = BigInt::from_biguint(Sign::Plus,&prod/&module);
-        sum += residue * mod_inv(p.clone(),BigInt::from_biguint(Sign::Plus,module)).unwrap() * p;
+        sum += residue * mod_inv(&p,&BigInt::from_biguint(Sign::Plus,module)).unwrap() * p;
     }
     sum%(BigInt::from_biguint(Sign::Plus,prod))
 }
 
 
-fn preprocessingA3(d:u32, q:u128, m:u32, f:HashMap<Vec<u32>,i128>) -> (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) { // This function returns the preprocessed data structure that allows fast evaluation of multivariate polynomials
+fn preprocessingA3(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) { // This function returns the preprocessed data structure that allows fast evaluation of multivariate polynomials
     let M: u128 = d.pow(m) as u128 * q.pow(m*(d-1)+1);
     let bound: u128 = 16*IntLog::log2(M) as u128;
-    let primes: Vec<u128> = get_primes(bound as u64).iter().map(|&x| x as u128).collect();
-    let mut DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = (primes.clone(),Vec::new());
-    let lift_f: HashMap<Vec<u32>,i128> = lift(&f,q);
-    for p_i in primes {
-        let f_i: HashMap<Vec<u32>,i128> = lift(&lift_f,p_i);
-        let T_i: HashMap<Vec<i128>,i128> = FFT_multipoint_eval(f_i,p_i,m);
+    let mut DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = (get_primes(bound as u64).iter().map(|&x| x as u128).collect(),Vec::new());
+    let lift_f: HashMap<Vec<u32>,i128> = lift(f,q);
+    for p_i in &DS.0 {
+        let f_i: HashMap<Vec<u32>,i128> = lift(&lift_f,*p_i);
+        let T_i: HashMap<Vec<i128>,i128> = FFT_multipoint_eval(&f_i,*p_i,m);
         DS.1.push(T_i);
     }
     DS
 }
 
 
-fn fast_evalA3(alpha:&Vec<i128>, DS:(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q:u128) -> i128 { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
-    //let t0: Instant = Instant::now();
+fn fast_evalA3(alpha:&Vec<i128>, DS:(&Vec<u128>,&Vec<HashMap<Vec<i128>,i128>>), q:u128) -> i128 { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
     let mut i: u32 = 0;
     let mut residues: Vec<i128> = Vec::with_capacity(DS.0.len() as usize);
-    let modules: Vec<u128> = DS.0;
-    for p_i in &modules {
+    let modules: &Vec<u128> = DS.0;
+    for p_i in modules {
         let alpha_i: Vec<i128> = alpha.iter().map(|x| x.rem_euclid(&(*p_i as i128))).collect();
         let f_alpha_i: i128 = *(DS.1[i as usize].get(&alpha_i).unwrap());
         residues.push(f_alpha_i);
         i += 1;
     }
-    //let init_time: Duration = t0.elapsed();
-    //println!("Time for initialization: {:?}", init_time);
-    //let t1: Instant = Instant::now();
-    let z: i128 = (Chinese_Remainder_Theorem(residues.iter().map(|x| x.to_bigint().unwrap()).collect(),modules.iter().map(|x| x.to_biguint().unwrap()).collect())%q).to_i128().unwrap();
-    //let CRT_time: Duration = t1.elapsed();
-    //println!("Time for CRT: {:?} \n", CRT_time);
+    let z: i128 = (Chinese_Remainder_Theorem(&residues.iter().map(|x| x.to_bigint().unwrap()).collect(),modules.iter().map(|x| x.to_biguint().unwrap()).collect())%q).to_i128().unwrap();
     z
 }
 
@@ -284,7 +287,7 @@ fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function 
     
     // Preprocessing data structure 
     let t0_preprocessing: Instant = Instant::now();
-    let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,f.clone());
+    let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     let time_preprocessing: Duration = t0_preprocessing.elapsed();
 
     if commented {
@@ -294,7 +297,7 @@ fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function 
 
     // Evaluations
     let t0_fe: Instant = Instant::now();
-    let fe: i128 = fast_evalA3(&alpha,DS,q);
+    let fe: i128 = fast_evalA3(&alpha,(&DS.0,&DS.1),q);
     let time_fe: Duration = t0_fe.elapsed();
 
     let t0_ne: Instant = Instant::now();
@@ -325,13 +328,13 @@ fn main() {
     let d: u32 = 2;
     let m: u32 = 2;
     let q: u128 = 3;
-    let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,f.clone());
+    let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     for alpha in (0..2).map(|i| 0..5 as i128).multi_cartesian_product() {
         println!("Alpha:");
         println!("{:?}",alpha);
         println!("Naive evaluation in alpha:");
         println!("{:?}\n",naive_eval(&alpha, &f, q));
         println!("Fast evaluation in alpha:");
-        println!("{:?}\n",fast_evalA3(&alpha, DS.clone(), q));
+        println!("{:?}\n",fast_evalA3(&alpha, (&DS.0,&DS.1), q));
     }
 }
