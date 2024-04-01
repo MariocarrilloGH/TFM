@@ -275,40 +275,21 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:(&Vec<u128>,&Vec<HashMap<Vec<i128>,i128>>), 
 }
 
 
-fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function compares the outcome of the fast algorithm with the naive algorithm
+fn test(d:u32, m:u32, q:u128) -> (u128,u128) { // This function compares the outcome of the fast algorithm with the naive algorithm
     // Initialization of random poly f and alpha with: degree d, number of variables m and ring Z_q
     let (f,alpha): (HashMap<Vec<u32>,i128>, Vec<i128>) = random_poly_alpha(d,q,m);
-    
-    if commented {
-        println!("Polynomial and alpha:");
-        println!("{:?} \n",(&f,&alpha));
-    }
-    
     // Preprocessing data structure 
     let t0_preprocessing: Instant = Instant::now();
     let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     let time_preprocessing: Duration = t0_preprocessing.elapsed();
-
-    if commented {
-        println!("Time for preprocessing algorithm:");
-        println!("{:?} \n",time_preprocessing);
-    }
-
     // Evaluations
     let t0_fe: Instant = Instant::now();
     let fe: i128 = fast_evalA3(&alpha,(&DS.0,&DS.1),q);
     let time_fe: Duration = t0_fe.elapsed();
-
+    
     let t0_ne: Instant = Instant::now();
     let ne: i128 = naive_eval(&alpha,&f,q);
     let time_ne: Duration = t0_ne.elapsed();
-
-    assert_eq!(fe,ne);
-    
-    if commented {
-        println!("Time for (fast algorithm, naive algorithm):");
-        println!("{:?} \n",(time_fe,time_ne));
-    }
     (time_fe.as_micros(),time_ne.as_micros())
 }
 
