@@ -178,7 +178,7 @@ fn multipoint_multivariate_evaluation(f:&HashMap<Vec<u32>,i128>, p_i:u128, m:u32
 }
 
 
-fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i128> { // This function reduces the polynomial f modulo (X^p_{j}-X_j) for every j in {0,...,m-1}
+fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i128> { // This function reduces the polynomial f modulo ((X_j)^p - X_j) for every j in {0,...,m-1}
     let mut red_f: HashMap<Vec<u32>,i128> = HashMap::with_capacity(f.len());
     for mon in f {
         let mut new_pows: Vec<u32> = Vec::with_capacity(m as usize);
@@ -187,10 +187,9 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
             if ((i_j as u128) < p) {new_pows.push(i_j);}
             else {
                 let n_j: u32 = (((i_j as u128 - p) as f64 / (p-1) as f64)+1.0).floor() as u32;
-                let new_pow: u32 = i_j - n_j * (p as u32) + n_j;
+                let new_pow: u32 = i_j + n_j - n_j * (p as u32);
                 new_pows.push(new_pow);
             }
-            
         }
         if (red_f.contains_key(&new_pows)) {
             let coeff: i128 = (red_f.get(&new_pows).unwrap() + mon.1) % (p as i128);
@@ -198,7 +197,7 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
             else {red_f.insert(new_pows,coeff);}
         }
         else {red_f.insert(new_pows,*mon.1);}
-    } 
+    }
     red_f
 }
 
