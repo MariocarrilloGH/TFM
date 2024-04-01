@@ -204,9 +204,7 @@ fn lift(f:&HashMap<Vec<u32>,i128>, q:u128) -> HashMap<Vec<u32>,i128> { // This f
     let mut lift_f: HashMap<Vec<u32>,i128> = HashMap::with_capacity(f.len() as usize);
     for (pows,coeff) in f {
         let new_coeff: i128 = coeff.rem_euclid(&(q as i128));
-        if (new_coeff != 0) {
-            lift_f.insert(pows.clone(),new_coeff);
-        }
+        lift_f.insert(pows.clone(),new_coeff);
     }
     lift_f
 }
@@ -315,19 +313,25 @@ fn test(d:u32, m:u32, q:u128, commented:bool) -> (u128,u128) { // This function 
 
 fn main() {
     let mut f: HashMap<Vec<u32>,i128> = HashMap::new();
+    f.insert(vec![2,2],3);
+    f.insert(vec![2,1],3);
+    f.insert(vec![2,0],0);
+    f.insert(vec![1,2],2);
     f.insert(vec![1,1],1);
-    f.insert(vec![1,0],2);
-    f.insert(vec![0,1],1);
+    f.insert(vec![1,0],4);
+    f.insert(vec![0,2],1);
+    f.insert(vec![0,1],0);
     f.insert(vec![0,0],1);
     let d: u32 = 2;
     let m: u32 = 2;
     let q: u128 = 3;
     let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,f.clone());
-    println!("{:?}",DS);
-    for alpha in (0..2).map(|i| 0..3 as i128).multi_cartesian_product() {
-        println!("Alpha");
+    for alpha in (0..2).map(|i| 0..5 as i128).multi_cartesian_product() {
+        println!("Alpha:");
         println!("{:?}",alpha);
-        println!("Evaluation in alpha:");
+        println!("Naive evaluation in alpha:");
+        println!("{:?}\n",naive_eval(&alpha, &f, q));
+        println!("Fast evaluation in alpha:");
         println!("{:?}\n",fast_evalA3(&alpha, DS.clone(), q));
     }
 }
