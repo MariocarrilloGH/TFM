@@ -9,6 +9,7 @@ use num_bigint::{BigUint, BigInt, Sign, ToBigInt, ToBigUint};
 use num_traits::ops::euclid::Euclid;
 use num_traits::cast::ToPrimitive;
 use polynomen::{poly,Poly};
+use plotters::prelude::*;
 
 
 fn random_poly_alpha(d:u32, q:u128, m:u32) -> (HashMap<Vec<u32>,i128>,Vec<i128>) { // This function generates a random polynomial of degree d, with m variables and in Z_q and also a value in which the polynomial can be evaluated
@@ -275,7 +276,7 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:(&Vec<u128>,&Vec<HashMap<Vec<i128>,i128>>), 
 }
 
 
-fn test(d:u32, m:u32, q:u128) -> (u128,u128) { // This function compares the outcome of the fast algorithm with the naive algorithm
+fn test(d:u32, m:u32, q:u128) -> (u128,u128,u128) { // This function compares the outcome of the fast algorithm with the naive algorithm
     // Initialization of random poly f and alpha with: degree d, number of variables m and ring Z_q
     let (f,alpha): (HashMap<Vec<u32>,i128>, Vec<i128>) = random_poly_alpha(d,q,m);
     // Preprocessing data structure 
@@ -290,31 +291,49 @@ fn test(d:u32, m:u32, q:u128) -> (u128,u128) { // This function compares the out
     let t0_ne: Instant = Instant::now();
     let ne: i128 = naive_eval(&alpha,&f,q);
     let time_ne: Duration = t0_ne.elapsed();
-    (time_fe.as_micros(),time_ne.as_micros())
+    (time_fe.as_millis(),time_ne.as_millis(),time_preprocessing.as_millis()/1000)
+}
+
+
+fn plotter() {
+    let q: u128 = 5;
+    let m: u32 = 3;
+    let mut fe_times: HashMap<u32,u128> = HashMap::with_capacity(11);
+    let mut ne_times: HashMap<u32,u128> = HashMap::with_capacity(11);
+    let mut prep_times: HashMap<u32,u128> = HashMap::with_capacity(11);
+    let mut x_values: [f64;11] = [0.,1.,2.,3.,4.,5.,6.,7.,8.,9.,10.];
+    let mut max_y_e: f64 = 0.;
+    let mut max_y_p: f64 = 0.;
+    for d in 0..11 {
+        //let time: (u128,u128,u128) = test(d,m,q);
+        let time: (u128,u128,u128) = (0,10,20);
+        fe_times.insert(d,time.0);
+        ne_times.insert(d,time.1);
+        prep_times.insert(d,time.2);
+        max_y_e = max_y_e.max(time.0 as f64).max(time.1 as f64);
+        max_y_p = max_y_p.max(time.2 as f64);
+    }
+
+    let drawing_area1 = BitMapBackend::new("test1.png", (1080, 810)).into_drawing_area();
+    drawing_area1.fill(&WHITE).unwrap();
+    let mut chart_builder1 = ChartBuilder::on(&drawing_area1);
+    chart_builder1.margin(20).set_left_and_bottom_label_area_size(20);
+    let mut chart_context1 = chart_builder1.caption("Preprocessing fixed q = 5 and m = 3", ("sans-serif", 30)).x_label_area_size(40).y_label_area_size(40).build_cartesian_2d(0.0..10.0, 0.0..max_y_p+10.0).unwrap();
+    chart_context1.configure_mesh().x_desc("Degree d").y_desc("Time in s").disable_mesh().x_label_formatter(&|x:&f64| format!("{:.0}", x)).draw().unwrap();
+    chart_context1.draw_series(LineSeries::new(x_values.map(|x| (x, *prep_times.get(&(x.round() as u32)).unwrap() as f64)), BLUE)).unwrap();
+
+    let drawing_area2 = BitMapBackend::new("test2.png", (1080, 810)).into_drawing_area();
+    drawing_area2.fill(&WHITE).unwrap();
+    let mut chart_builder2 = ChartBuilder::on(&drawing_area2);
+    chart_builder2.margin(20).set_left_and_bottom_label_area_size(20);
+    let mut chart_context2 = chart_builder2.caption("Evaluations fixed q = 5 and m = 3", ("sans-serif", 30)).x_label_area_size(40).y_label_area_size(40).build_cartesian_2d(0.0..10.0, 0.0..max_y_e+10.0).unwrap();
+    chart_context2.configure_mesh().x_desc("Degree d").y_desc("Time in ms").disable_mesh().x_label_formatter(&|x:&f64| format!("{:.0}", x)).draw().unwrap();
+    chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *fe_times.get(&(x.round() as u32)).unwrap() as f64)), BLUE)).unwrap().label("KU08 evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
+    chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *ne_times.get(&(x.round() as u32)).unwrap() as f64)), RED)).unwrap().label("Naive evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
+    chart_context2.configure_series_labels().position(SeriesLabelPosition::LowerRight).border_style(BLACK).draw().unwrap();
 }
 
 
 fn main() {
-    let mut f: HashMap<Vec<u32>,i128> = HashMap::new();
-    f.insert(vec![2,2],3);
-    f.insert(vec![2,1],3);
-    f.insert(vec![2,0],0);
-    f.insert(vec![1,2],2);
-    f.insert(vec![1,1],1);
-    f.insert(vec![1,0],4);
-    f.insert(vec![0,2],1);
-    f.insert(vec![0,1],0);
-    f.insert(vec![0,0],1);
-    let d: u32 = 2;
-    let m: u32 = 2;
-    let q: u128 = 3;
-    let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
-    for alpha in (0..2).map(|i| 0..5 as i128).multi_cartesian_product() {
-        println!("Alpha:");
-        println!("{:?}",alpha);
-        println!("Naive evaluation in alpha:");
-        println!("{:?}\n",naive_eval(&alpha, &f, q));
-        println!("Fast evaluation in alpha:");
-        println!("{:?}\n",fast_evalA3(&alpha, (&DS.0,&DS.1), q));
-    }
+    plotter();
 }
