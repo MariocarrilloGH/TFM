@@ -310,7 +310,6 @@ fn plotter() {
     let mut max_y_e: f64 = 0.;
     let mut max_y_p: f64 = 0.;
     for d in 0..11 {
-        //let time: (u128,u128,u128) = test(d,m,q);
         let time: (u128,u128,u128) = (0,10,20);
         fe_times.insert(d,time.0);
         ne_times.insert(d,time.1);
@@ -332,7 +331,7 @@ fn plotter() {
     let mut chart_builder2 = ChartBuilder::on(&drawing_area2);
     chart_builder2.margin(20).set_left_and_bottom_label_area_size(20);
     let mut chart_context2 = chart_builder2.caption("Evaluations fixed q = 5 and m = 3", ("sans-serif", 30)).x_label_area_size(40).y_label_area_size(40).build_cartesian_2d(0.0..10.0, 0.0..max_y_e+10.0).unwrap();
-    chart_context2.configure_mesh().x_desc("Degree d").y_desc("Time in ms").disable_mesh().x_label_formatter(&|x:&f64| format!("{:.0}", x)).draw().unwrap();
+    chart_context2.configure_mesh().x_desc("Degree d").y_desc("Time in s").disable_mesh().x_label_formatter(&|x:&f64| format!("{:.0}", x)).draw().unwrap();
     chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *fe_times.get(&(x.round() as u32)).unwrap() as f64)), BLUE)).unwrap().label("KU08 evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
     chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *ne_times.get(&(x.round() as u32)).unwrap() as f64)), RED)).unwrap().label("Naive evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
     chart_context2.configure_series_labels().position(SeriesLabelPosition::LowerRight).border_style(BLACK).draw().unwrap();
@@ -340,9 +339,9 @@ fn plotter() {
 
 
 fn main() -> std::io::Result<()> {
-    let qs: Vec<u128> = vec![2,3,5,7,11];
-    let ms: Vec<u32> = vec![1,2,3,4,5];
-    let ds: Vec<u32> = vec![1,2,3,4,5];
+    let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
+    let ms: Vec<u32> = vec![1,2,3,4];
+    let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
     let mut writer: File = OpenOptions::new().append(true).read(true).open("test.json")?;
     writer.write(b"[\n");
     let mut json_writer_settings: WriterSettings = WriterSettings::default();
@@ -351,6 +350,7 @@ fn main() -> std::io::Result<()> {
     for d in ds {
         for m in ms.iter() {
             for q in qs.iter() {
+                let (time_fe,time_ne,time_preprocessing): (Duration,Duration,Duration) = test(d,*m,*q);
                 json_writer.begin_object()?;
                 
                 json_writer.name("d")?;
@@ -361,6 +361,15 @@ fn main() -> std::io::Result<()> {
 
                 json_writer.name("q")?;
                 json_writer.number_value(*q)?;
+
+                json_writer.name("time_preprocessing")?;
+                json_writer.fp_number_value(time_preprocessing.as_secs_f64());
+
+                json_writer.name("time_fast_eval")?;
+                json_writer.fp_number_value(time_fe.as_secs_f64());
+
+                json_writer.name("time_naive_eval")?;
+                json_writer.fp_number_value(time_ne.as_secs_f64());
             
                 json_writer.end_object()?;
             }
