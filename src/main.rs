@@ -338,11 +338,8 @@ fn plotter() {
 }
 
 
-fn main() -> std::io::Result<()> {
-    let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
-    let ms: Vec<u32> = vec![1,2,3,4];
-    let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
-    let mut writer: File = OpenOptions::new().append(true).read(true).open("test.json")?;
+fn to_json(ds: Vec<u32>, ms: Vec<u32>, qs: Vec<u128>, file_path: &str) -> std::io::Result<()> {
+    let mut writer: File = OpenOptions::new().append(true).read(true).open(file_path)?;
     writer.write(b"[\n");
     let mut json_writer_settings: WriterSettings = WriterSettings::default();
     json_writer_settings.multi_top_level_value_separator = Some(String::from(",\n"));
@@ -378,4 +375,13 @@ fn main() -> std::io::Result<()> {
     json_writer.finish_document()?;
     writer.write(b"\n]");
     Ok(())
+}
+
+
+fn main() -> std::io::Result<()> {
+    let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
+    let ms: Vec<u32> = vec![1,2,3,4];
+    let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
+    let file_path: &str = "test.json";
+    to_json(ds,ms,qs,file_path)
 }
