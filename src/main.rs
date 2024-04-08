@@ -10,6 +10,9 @@ use num_traits::ops::euclid::Euclid;
 use num_traits::cast::ToPrimitive;
 use polynomen::{poly,Poly};
 use plotters::prelude::*;
+use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
+use struson::writer::*;
 
 
 fn random_poly_alpha(d:u32, q:u128, m:u32) -> (HashMap<Vec<u32>,i128>,Vec<i128>) { // This function generates a random polynomial of degree d, with m variables and in Z_q and also a value in which the polynomial can be evaluated
@@ -43,7 +46,7 @@ fn naive_eval(x:&Vec<i128>, f:&HashMap<Vec<u32>,i128>, q:u128) -> i128 { // This
 }
 
 
-fn add_head(h:i128, x:&Vec<i128>) -> Vec<i128> { // Auxiliary function to add a head to a vec
+fn add_head(h:i128, x:&Vec<i128>) -> Vec<i128> { // This is an auxiliary function to add a head to a vec
     let l: usize = x.len()+1;
     let mut hx: Vec<i128> = Vec::with_capacity(l);
     hx.push(h);
@@ -261,10 +264,11 @@ fn preprocessingA3(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128
 }
 
 
-fn fast_evalA3(alpha:&Vec<i128>, DS:(&Vec<u128>,&Vec<HashMap<Vec<i128>,i128>>), q:u128) -> i128 { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
+fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q:u128) -> (i128,Duration) { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
+    let t0_in: Instant = Instant::now();
     let mut i: u32 = 0;
     let mut residues: Vec<i128> = Vec::with_capacity(DS.0.len() as usize);
-    let modules: &Vec<u128> = DS.0;
+    let modules: &Vec<u128> = &DS.0;
     for p_i in modules {
         let alpha_i: Vec<i128> = alpha.iter().map(|x| x.rem_euclid(&(*p_i as i128))).collect();
         let f_alpha_i: i128 = *(DS.1[i as usize].get(&alpha_i).unwrap());
@@ -272,11 +276,12 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:(&Vec<u128>,&Vec<HashMap<Vec<i128>,i128>>), 
         i += 1;
     }
     let z: i128 = (Chinese_Remainder_Theorem(&residues.iter().map(|x| x.to_bigint().unwrap()).collect(),modules.iter().map(|x| x.to_biguint().unwrap()).collect())%q).to_i128().unwrap();
-    z
+    let time_in: Duration = t0_in.elapsed();
+    (z,time_in)
 }
 
 
-fn test(d:u32, m:u32, q:u128) -> (u128,u128,u128) { // This function compares the outcome of the fast algorithm with the naive algorithm
+fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function compares the outcome of the fast algorithm with the naive algorithm
     // Initialization of random poly f and alpha with: degree d, number of variables m and ring Z_q
     let (f,alpha): (HashMap<Vec<u32>,i128>, Vec<i128>) = random_poly_alpha(d,q,m);
     // Preprocessing data structure 
@@ -284,14 +289,14 @@ fn test(d:u32, m:u32, q:u128) -> (u128,u128,u128) { // This function compares th
     let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     let time_preprocessing: Duration = t0_preprocessing.elapsed();
     // Evaluations
-    let t0_fe: Instant = Instant::now();
-    let fe: i128 = fast_evalA3(&alpha,(&DS.0,&DS.1),q);
-    let time_fe: Duration = t0_fe.elapsed();
+    //let t0_fe: Instant = Instant::now();
+    let (fe,time_fe): (i128,Duration) = fast_evalA3(&alpha,&DS,q);
+    //let time_fe: Duration = t0_fe.elapsed();
     
     let t0_ne: Instant = Instant::now();
     let ne: i128 = naive_eval(&alpha,&f,q);
     let time_ne: Duration = t0_ne.elapsed();
-    (time_fe.as_millis(),time_ne.as_millis(),time_preprocessing.as_millis()/1000)
+    (time_fe,time_ne,time_preprocessing)
 }
 
 
@@ -334,6 +339,34 @@ fn plotter() {
 }
 
 
-fn main() {
-    plotter();
+fn main() -> std::io::Result<()> {
+    let qs: Vec<u128> = vec![2,3,5,7,11];
+    let ms: Vec<u32> = vec![1,2,3,4,5];
+    let ds: Vec<u32> = vec![1,2,3,4,5];
+    let mut writer: File = OpenOptions::new().append(true).read(true).open("test.json")?;
+    writer.write(b"[\n");
+    let mut json_writer_settings: WriterSettings = WriterSettings::default();
+    json_writer_settings.multi_top_level_value_separator = Some(String::from(",\n"));
+    let mut json_writer: JsonStreamWriter<&mut File> = JsonStreamWriter::new_custom(&mut writer,json_writer_settings);
+    for d in ds {
+        for m in ms.iter() {
+            for q in qs.iter() {
+                json_writer.begin_object()?;
+                
+                json_writer.name("d")?;
+                json_writer.number_value(d)?;
+
+                json_writer.name("m")?;
+                json_writer.number_value(*m)?;
+
+                json_writer.name("q")?;
+                json_writer.number_value(*q)?;
+            
+                json_writer.end_object()?;
+            }
+        }
+    }
+    json_writer.finish_document()?;
+    writer.write(b"\n]");
+    Ok(())
 }
