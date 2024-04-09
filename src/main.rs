@@ -300,25 +300,23 @@ fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function
 }
 
 
-fn plotter() {
-    let q: u128 = 5;
-    let m: u32 = 3;
+fn plotter(d:u32, m:u32, q:u128, times:Vec<(f64,f64,f64)>) {
     let mut fe_times: HashMap<u32,u128> = HashMap::with_capacity(11);
     let mut ne_times: HashMap<u32,u128> = HashMap::with_capacity(11);
     let mut prep_times: HashMap<u32,u128> = HashMap::with_capacity(11);
     let mut x_values: [f64;11] = [0.,1.,2.,3.,4.,5.,6.,7.,8.,9.,10.];
     let mut max_y_e: f64 = 0.;
     let mut max_y_p: f64 = 0.;
-    for d in 0..11 {
+    for t in times {
         let time: (u128,u128,u128) = (0,10,20);
         fe_times.insert(d,time.0);
         ne_times.insert(d,time.1);
         prep_times.insert(d,time.2);
-        max_y_e = max_y_e.max(time.0 as f64).max(time.1 as f64);
-        max_y_p = max_y_p.max(time.2 as f64);
+        max_y_p = max_y_p.max(t.0);
+        max_y_e = max_y_e.max(t.1).max(t.2);
     }
 
-    let drawing_area1 = BitMapBackend::new("test1.png", (1080, 810)).into_drawing_area();
+    let drawing_area1 = BitMapBackend::new("preprocessing.png", (1080, 810)).into_drawing_area();
     drawing_area1.fill(&WHITE).unwrap();
     let mut chart_builder1 = ChartBuilder::on(&drawing_area1);
     chart_builder1.margin(20).set_left_and_bottom_label_area_size(20);
@@ -326,7 +324,7 @@ fn plotter() {
     chart_context1.configure_mesh().x_desc("Degree d").y_desc("Time in s").disable_mesh().x_label_formatter(&|x:&f64| format!("{:.0}", x)).draw().unwrap();
     chart_context1.draw_series(LineSeries::new(x_values.map(|x| (x, *prep_times.get(&(x.round() as u32)).unwrap() as f64)), BLUE)).unwrap();
 
-    let drawing_area2 = BitMapBackend::new("test2.png", (1080, 810)).into_drawing_area();
+    let drawing_area2 = BitMapBackend::new("evaluations.png", (1080, 810)).into_drawing_area();
     drawing_area2.fill(&WHITE).unwrap();
     let mut chart_builder2 = ChartBuilder::on(&drawing_area2);
     chart_builder2.margin(20).set_left_and_bottom_label_area_size(20);
@@ -338,23 +336,23 @@ fn plotter() {
 }
 
 
-fn to_json(ds: Vec<u32>, ms: Vec<u32>, qs: Vec<u128>, file_path: &str) -> std::io::Result<()> {
+fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::Result<()> {
     let mut writer: File = OpenOptions::new().append(true).read(true).open(file_path)?;
     writer.write(b"[\n");
     let mut json_writer_settings: WriterSettings = WriterSettings::default();
     json_writer_settings.multi_top_level_value_separator = Some(String::from(",\n"));
     let mut json_writer: JsonStreamWriter<&mut File> = JsonStreamWriter::new_custom(&mut writer,json_writer_settings);
-    for d in ds {
-        for m in ms.iter() {
+    for m in ms {
+        for d in ds.iter() {
             for q in qs.iter() {
-                let (time_fe,time_ne,time_preprocessing): (Duration,Duration,Duration) = test(d,*m,*q);
+                let (time_fe,time_ne,time_preprocessing): (Duration,Duration,Duration) = test(*d,m,*q);
                 json_writer.begin_object()?;
                 
-                json_writer.name("d")?;
-                json_writer.number_value(d)?;
-
                 json_writer.name("m")?;
-                json_writer.number_value(*m)?;
+                json_writer.number_value(m)?;
+
+                json_writer.name("d")?;
+                json_writer.number_value(*d)?;
 
                 json_writer.name("q")?;
                 json_writer.number_value(*q)?;
@@ -379,8 +377,8 @@ fn to_json(ds: Vec<u32>, ms: Vec<u32>, qs: Vec<u128>, file_path: &str) -> std::i
 
 
 fn main() -> std::io::Result<()> {
+    let ms: Vec<u32> = vec![1,2,3];
     let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
-    let ms: Vec<u32> = vec![1,2,3,4];
     let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
     let file_path: &str = "test.json";
     to_json(ds,ms,qs,file_path)
