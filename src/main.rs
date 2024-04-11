@@ -9,7 +9,7 @@ use num_bigint::{BigUint, BigInt, Sign, ToBigInt, ToBigUint};
 use num_traits::ops::euclid::Euclid;
 use num_traits::cast::ToPrimitive;
 use polynomen::{poly,Poly};
-use plotters::prelude::*;
+/*use plotters::prelude::*;*/
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use struson::writer::*;
@@ -239,14 +239,14 @@ fn mod_inv(x:&BigInt, n:&BigInt) -> Option<BigInt> { // This is an auxiliary fun
 }
 
 
-fn Chinese_Remainder_Theorem(residues:&Vec<BigInt>, modules:Vec<BigUint>) -> BigInt { // This function solves a system of modular equations given the modules and the residues using CRT
-    let prod: BigUint = modules.iter().product();
+fn Chinese_Remainder_Theorem(residues:&Vec<BigInt>, modules:&Vec<BigInt>) -> BigInt { // This function solves a system of modular equations given the modules and the residues using CRT algorithm
+    let prod: BigInt = modules.iter().product();
     let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
     for (residue,module) in residues.iter().zip(modules) {
-        let p: BigInt = BigInt::from_biguint(Sign::Plus,&prod/&module);
-        sum += residue * mod_inv(&p,&BigInt::from_biguint(Sign::Plus,module)).unwrap() * p;
+        let p: BigInt = &prod/module;
+        sum += residue * mod_inv(&p,module).unwrap() * p;
     }
-    sum%(BigInt::from_biguint(Sign::Plus,prod))
+    sum%prod
 }
 
 
@@ -267,27 +267,39 @@ fn preprocessingA3(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128
 fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q:u128) -> (i128,Duration) { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA3
     let t0_in: Instant = Instant::now();
     let mut i: u32 = 0;
-    let mut residues: Vec<i128> = Vec::with_capacity(DS.0.len() as usize);
     let modules: &Vec<u128> = &DS.0;
+    let mut CRT_residues: Vec<BigInt> = Vec::with_capacity(modules.len() as usize);
     for p_i in modules {
         let alpha_i: Vec<i128> = alpha.iter().map(|x| x.rem_euclid(&(*p_i as i128))).collect();
         let f_alpha_i: i128 = *(DS.1[i as usize].get(&alpha_i).unwrap());
-        residues.push(f_alpha_i);
+        CRT_residues.push(f_alpha_i.to_bigint().unwrap());
         i += 1;
     }
-    let z: i128 = (Chinese_Remainder_Theorem(&residues.iter().map(|x| x.to_bigint().unwrap()).collect(),modules.iter().map(|x| x.to_biguint().unwrap()).collect())%q).to_i128().unwrap();
-    let time_in: Duration = t0_in.elapsed();
-    (z,time_in)
+    let CRT_modules: Vec<BigInt> = modules.iter().map(|x| x.to_bigint().unwrap()).collect();
+    //let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,CRT_modules)%q).to_i128().unwrap();
+    // Next lines implement CRT (calling the function takes longer than adding the code here)
+    let prod: BigInt = CRT_modules.iter().product();
+    let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
+    for (residue,module) in CRT_residues.iter().zip(CRT_modules) {
+        let p: BigInt = &prod/&module;
+        sum += residue * mod_inv(&p,&module).unwrap() * p;
+    }
+    let z: i128 = ((sum%prod)%q).to_i128().unwrap();
+
+    let tf_in: Duration = t0_in.elapsed();
+    (z,tf_in)
 }
 
 
 fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function compares the outcome of the fast algorithm with the naive algorithm
     // Initialization of random poly f and alpha with: degree d, number of variables m and ring Z_q
     let (f,alpha): (HashMap<Vec<u32>,i128>, Vec<i128>) = random_poly_alpha(d,q,m);
+
     // Preprocessing data structure 
     let t0_preprocessing: Instant = Instant::now();
     let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     let time_preprocessing: Duration = t0_preprocessing.elapsed();
+
     // Evaluations
     //let t0_fe: Instant = Instant::now();
     let (fe,time_fe): (i128,Duration) = fast_evalA3(&alpha,&DS,q);
@@ -296,11 +308,13 @@ fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function
     let t0_ne: Instant = Instant::now();
     let ne: i128 = naive_eval(&alpha,&f,q);
     let time_ne: Duration = t0_ne.elapsed();
+
+    assert_eq!(ne,fe);
     (time_fe,time_ne,time_preprocessing)
 }
 
 
-fn plotter(d:u32, m:u32, q:u128, times:Vec<(f64,f64,f64)>) {
+/*fn plotter(d:u32, m:u32, q:u128, times:Vec<(f64,f64,f64)>) {
     let mut fe_times: HashMap<u32,u128> = HashMap::with_capacity(11);
     let mut ne_times: HashMap<u32,u128> = HashMap::with_capacity(11);
     let mut prep_times: HashMap<u32,u128> = HashMap::with_capacity(11);
@@ -333,7 +347,7 @@ fn plotter(d:u32, m:u32, q:u128, times:Vec<(f64,f64,f64)>) {
     chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *fe_times.get(&(x.round() as u32)).unwrap() as f64)), BLUE)).unwrap().label("KU08 evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLUE));
     chart_context2.draw_series(LineSeries::new(x_values.map(|x| (x, *ne_times.get(&(x.round() as u32)).unwrap() as f64)), RED)).unwrap().label("Naive evaluation").legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED));
     chart_context2.configure_series_labels().position(SeriesLabelPosition::LowerRight).border_style(BLACK).draw().unwrap();
-}
+}*/
 
 
 fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::Result<()> {
@@ -377,7 +391,7 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 
 
 fn main() -> std::io::Result<()> {
-    let ms: Vec<u32> = vec![1,2,3];
+    let ms: Vec<u32> = vec![1,2];
     let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
     let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
     let file_path: &str = "test.json";
