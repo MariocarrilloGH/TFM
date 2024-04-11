@@ -197,8 +197,7 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
         }
         if (red_f.contains_key(&new_pows)) {
             let coeff: i128 = (red_f.get(&new_pows).unwrap() + mon.1) % (p as i128);
-            if (coeff == 0) {red_f.remove(&new_pows);}
-            else {red_f.insert(new_pows,coeff);}
+            red_f.insert(new_pows,coeff);
         }
         else {red_f.insert(new_pows,*mon.1);}
     }
@@ -276,15 +275,15 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q
         i += 1;
     }
     let CRT_modules: Vec<BigInt> = modules.iter().map(|x| x.to_bigint().unwrap()).collect();
-    //let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,CRT_modules)%q).to_i128().unwrap();
+    let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,&CRT_modules)%q).to_i128().unwrap();
     // Next lines implement CRT (calling the function takes longer than adding the code here)
-    let prod: BigInt = CRT_modules.iter().product();
+    /*let prod: BigInt = CRT_modules.iter().product();
     let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
     for (residue,module) in CRT_residues.iter().zip(CRT_modules) {
         let p: BigInt = &prod/&module;
         sum += residue * mod_inv(&p,&module).unwrap() * p;
     }
-    let z: i128 = ((sum%prod)%q).to_i128().unwrap();
+    let z: i128 = ((sum%prod)%q).to_i128().unwrap();*/
 
     let tf_in: Duration = t0_in.elapsed();
     (z,tf_in)
@@ -391,7 +390,7 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 
 
 fn main() -> std::io::Result<()> {
-    let ms: Vec<u32> = vec![1,2];
+    let ms: Vec<u32> = vec![1];
     let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
     let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
     let file_path: &str = "test.json";
