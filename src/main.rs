@@ -275,15 +275,16 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q
         i += 1;
     }
     let CRT_modules: Vec<BigInt> = modules.iter().map(|x| x.to_bigint().unwrap()).collect();
-    let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,&CRT_modules)%q).to_i128().unwrap();
+    //let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,&CRT_modules)%q).to_i128().unwrap();
+    
     // Next lines implement CRT (calling the function takes longer than adding the code here)
-    /*let prod: BigInt = CRT_modules.iter().product();
+    let prod: BigInt = CRT_modules.iter().product();
     let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
     for (residue,module) in CRT_residues.iter().zip(CRT_modules) {
         let p: BigInt = &prod/&module;
         sum += residue * mod_inv(&p,&module).unwrap() * p;
     }
-    let z: i128 = ((sum%prod)%q).to_i128().unwrap();*/
+    let z: i128 = ((sum%prod)%q).to_i128().unwrap();
 
     let tf_in: Duration = t0_in.elapsed();
     (z,tf_in)
