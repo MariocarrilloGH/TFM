@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "ilog",
  "itertools",
+ "memuse",
  "num-bigint",
  "num-traits",
  "polynomen",
@@ -103,6 +104,12 @@ dependencies = [
  "autocfg",
  "rawpointer",
 ]
+
+[[package]]
+name = "memuse"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2145869435ace5ea6ea3d35f59be559317ec9a0d04e1812d5f185a87b6d36f1a"
 
 [[package]]
 name = "ndarray"

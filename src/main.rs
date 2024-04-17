@@ -13,6 +13,7 @@ use polynomen::{poly,Poly};
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use struson::writer::*;
+use memuse::DynamicUsage;
 
 
 fn random_poly_alpha(d:u32, q:u128, m:u32) -> (HashMap<Vec<u32>,i128>,Vec<i128>) { // This function generates a random polynomial of degree d, with m variables and in Z_q and also a value in which the polynomial can be evaluated
@@ -291,7 +292,7 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q
 }
 
 
-fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function compares the outcome of the fast algorithm with the naive algorithm
+fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration,usize) { // This function compares the outcome of the fast algorithm with the naive algorithm
     // Initialization of random poly f and alpha with: degree d, number of variables m and ring Z_q
     let (f,alpha): (HashMap<Vec<u32>,i128>, Vec<i128>) = random_poly_alpha(d,q,m);
 
@@ -299,6 +300,7 @@ fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function
     let t0_preprocessing: Instant = Instant::now();
     let DS: (Vec<u128>, Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
     let time_preprocessing: Duration = t0_preprocessing.elapsed();
+    let mem_usage: usize = DS.dynamic_usage();
 
     // Evaluations
     //let t0_fe: Instant = Instant::now();
@@ -310,7 +312,7 @@ fn test(d:u32, m:u32, q:u128) -> (Duration,Duration,Duration) { // This function
     let time_ne: Duration = t0_ne.elapsed();
 
     assert_eq!(ne,fe);
-    (time_fe,time_ne,time_preprocessing)
+    (time_fe,time_ne,time_preprocessing,mem_usage)
 }
 
 
@@ -359,7 +361,7 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
     for m in ms {
         for d in ds.iter() {
             for q in qs.iter() {
-                let (time_fe,time_ne,time_preprocessing): (Duration,Duration,Duration) = test(*d,m,*q);
+                let (time_fe,time_ne,time_preprocessing, mem): (Duration,Duration,Duration,usize) = test(*d,m,*q);
                 json_writer.begin_object()?;
                 
                 json_writer.name("m")?;
@@ -373,6 +375,9 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 
                 json_writer.name("time_preprocessing")?;
                 json_writer.fp_number_value(time_preprocessing.as_secs_f64());
+
+                json_writer.name("memory_usage")?;
+                json_writer.fp_number_value(mem as f64/(1000f64.powi(2))); //In MB
 
                 json_writer.name("time_fast_eval")?;
                 json_writer.fp_number_value(time_fe.as_secs_f64());
@@ -392,8 +397,8 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 
 fn main() -> std::io::Result<()> {
     let ms: Vec<u32> = vec![1];
-    let qs: Vec<u128> = vec![2,3,5,7,11,13,17,19,23,29];
-    let ds: Vec<u32> = vec![1,2,3,4,5,6,7,8,9,10];
+    let qs: Vec<u128> = vec![2,3];
+    let ds: Vec<u32> = vec![1,2];
     let file_path: &str = "test.json";
     to_json(ds,ms,qs,file_path)
 }
