@@ -250,7 +250,7 @@ fn Chinese_Remainder_Theorem(residues:&Vec<BigInt>, modules:&Vec<BigInt>) -> Big
 }
 
 
-fn preprocessingA3(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) { // This function returns the preprocessed data structure that allows fast evaluation of multivariate polynomials
+fn preprocessingA3(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) { // This function returns the preprocessed data structure that allows fast evaluation of multivariate polynomials in theorem A4
     let M: u128 = d.pow(m) as u128 * q.pow(m*(d-1)+1);
     let bound: u128 = 16*IntLog::log2(M) as u128;
     let mut DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = (get_primes(bound as u64).iter().map(|&x| x as u128).collect(),Vec::new());
@@ -279,6 +279,46 @@ fn fast_evalA3(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>), q
     //let z: i128 = (Chinese_Remainder_Theorem(&CRT_residues,&CRT_modules)%q).to_i128().unwrap();
     
     // Next lines implement CRT (calling the function takes longer than adding the code here)
+    let prod: BigInt = CRT_modules.iter().product();
+    let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
+    for (residue,module) in CRT_residues.iter().zip(CRT_modules) {
+        let p: BigInt = &prod/&module;
+        sum += residue * mod_inv(&p,&module).unwrap() * p;
+    }
+    let z: i128 = ((sum%prod)%q).to_i128().unwrap();
+
+    let tf_in: Duration = t0_in.elapsed();
+    (z,tf_in)
+}
+
+
+fn preprocessingA4(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128>,Vec<(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>)>) { // This function returns the preprocessed data structure that allows fast evaluation of multivariate polynomials in theorem A4
+    let M: u128 = d.pow(m) as u128 * q.pow(m*(d-1)+1);
+    let bound: u128 = 16*IntLog::log2(M) as u128;
+    let mut DS: (Vec<u128>,Vec<(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>)>) = (get_primes(bound as u64).iter().map(|&x| x as u128).collect(),Vec::new());
+    let lift_f: HashMap<Vec<u32>,i128> = lift(f,q);
+    for p_i in &DS.0 {
+        let f_i: HashMap<Vec<u32>,i128> = lift(&lift_f,*p_i);
+        let T_i: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,*p_i,m,&f_i);
+        DS.1.push(T_i);
+    }
+    DS
+}
+
+
+fn fast_evalA4(alpha:&Vec<i128>, DS:&(Vec<u128>,Vec<(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>)>), q:u128) -> (i128,Duration) { // This function evaluates multivariate polynomials fast by using the data structure returned by preprocessingA4
+    let t0_in: Instant = Instant::now();
+    let mut i: u32 = 0;
+    let modules: &Vec<u128> = &DS.0;
+    let mut CRT_residues: Vec<BigInt> = Vec::with_capacity(modules.len() as usize);
+    for p_i in modules {
+        let alpha_i: Vec<i128> = alpha.iter().map(|x| x.rem_euclid(&(*p_i as i128))).collect();
+        let T_i: &(Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = &DS.1[i as usize];
+        let f_alpha_i: i128 = fast_evalA3(&alpha_i,T_i,q).0;
+        CRT_residues.push(f_alpha_i.to_bigint().unwrap());
+        i += 1;
+    }
+    let CRT_modules: Vec<BigInt> = modules.iter().map(|x| x.to_bigint().unwrap()).collect();
     let prod: BigInt = CRT_modules.iter().product();
     let mut sum: BigInt = BigInt::new(Sign::Plus, vec![0]);
     for (residue,module) in CRT_residues.iter().zip(CRT_modules) {
@@ -377,7 +417,7 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
                 json_writer.fp_number_value(time_preprocessing.as_secs_f64());
 
                 json_writer.name("memory_usage")?;
-                json_writer.fp_number_value(mem as f64/(1000f64.powi(2))); //In MB
+                json_writer.fp_number_value(mem as f64/(1000f64.powi(2))); // In MB
 
                 json_writer.name("time_fast_eval")?;
                 json_writer.fp_number_value(time_fe.as_secs_f64());
@@ -396,9 +436,9 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 
 
 fn main() -> std::io::Result<()> {
-    let ms: Vec<u32> = vec![1];
+    let ms: Vec<u32> = vec![1,2];
     let qs: Vec<u128> = vec![2,3];
-    let ds: Vec<u32> = vec![1,2];
+    let ds: Vec<u32> = vec![1,2,3];
     let file_path: &str = "test.json";
     to_json(ds,ms,qs,file_path)
 }
