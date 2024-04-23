@@ -206,9 +206,9 @@ fn module_Xp_X(f:&HashMap<Vec<u32>,i128>, p:u128, m:u32) -> HashMap<Vec<u32>,i12
 }
 
 
-fn FFT_multipoint_eval(f:&HashMap<Vec<u32>,i128>, p_i:u128, m:u32) -> HashMap<Vec<i128>,i128> { // This function implements [KU08, Theorem 4.1] (reduces f and evaluates it on all (Z_p_i)^m using FFT based multipoint evaluation)
-    let red_f: HashMap<Vec<u32>,i128> = module_Xp_X(f,p_i,m);
-    let T_i: HashMap<Vec<i128>,i128> = multipoint_multivariate_evaluation(&red_f,p_i,m);
+fn FFT_multipoint_eval(f_i:&HashMap<Vec<u32>,i128>, p_i:u128, m:u32) -> HashMap<Vec<i128>,i128> { // This function implements [KU08, Theorem 4.1] (reduces f and evaluates it on all (Z_p_i)^m using FFT based multipoint evaluation)
+    let red_f_i: HashMap<Vec<u32>,i128> = module_Xp_X(f_i,p_i,m);
+    let T_i: HashMap<Vec<i128>,i128> = multipoint_multivariate_evaluation(&red_f_i,p_i,m);
     T_i
 }
 
@@ -299,7 +299,8 @@ fn preprocessingA4(d:u32, q:u128, m:u32, f:&HashMap<Vec<u32>,i128>) -> (Vec<u128
     let lift_f: HashMap<Vec<u32>,i128> = lift(f,q);
     for p_i in &DS.0 {
         let f_i: HashMap<Vec<u32>,i128> = lift(&lift_f,*p_i);
-        let T_i: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,*p_i,m,&f_i);
+        let red_f_i: HashMap<Vec<u32>,i128> = module_Xp_X(&f_i,*p_i,m);
+        let T_i: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(*p_i as u32,*p_i,m,&red_f_i);
         DS.1.push(T_i);
     }
     DS
