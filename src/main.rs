@@ -3,6 +3,7 @@ use ilog::IntLog;
 use prime_checker::get_primes;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use std::vec;
 use rand::Rng;
 use itertools::Itertools;
 use num_bigint::{BigUint, BigInt, Sign, ToBigInt, ToBigUint};
@@ -436,10 +437,19 @@ fn to_json(ds:Vec<u32>, ms:Vec<u32>, qs:Vec<u128>, file_path:&str) -> std::io::R
 }
 
 
-fn main() -> std::io::Result<()> {
-    let ms: Vec<u32> = vec![1,2];
-    let qs: Vec<u128> = vec![2,3];
-    let ds: Vec<u32> = vec![1,2,3];
-    let file_path: &str = "test.json";
-    to_json(ds,ms,qs,file_path)
+fn main() {
+    let mut f:HashMap<Vec<u32>,i128> = HashMap::new();
+    f.insert(vec![1,1],1);
+    f.insert(vec![1,0],2);
+    f.insert(vec![0,1],1);
+    f.insert(vec![0,0],1);
+    let d: u32 = 2;
+    let m: u32 = 2;
+    let q: u128 = 5;
+    let DS: (Vec<u128>,Vec<HashMap<Vec<i128>,i128>>) = preprocessingA3(d,q,m,&f);
+    println!();
+    for alpha in (0..2).map(|i| 0..5 as i128).multi_cartesian_product() {
+        println!("Evaluation in alpha={:?} is: {:?}",alpha,fast_evalA3(&alpha,&DS,q).0);
+        if alpha[1] == 4 {println!();}
+    }
 }
